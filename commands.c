@@ -186,6 +186,8 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		buffer_append_int32(send_buffer, mc_interface_get_tachometer_abs_value(false), &ind);
 		send_buffer[ind++] = mc_interface_get_fault();
 		buffer_append_float32(send_buffer, mc_interface_get_pid_pos_now(), 1e6, &ind);
+		send_buffer[ind++] = app_get_configuration()->controller_id;
+
 		commands_send_packet(send_buffer, ind);
 		break;
 
@@ -926,7 +928,9 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 			|| appconf.app_to_use == APP_NONE 
 			|| appconf.app_to_use == APP_UART 
 			|| appconf.app_to_use == APP_NUNCHUK 
-			|| appconf.app_to_use == APP_NRF) {
+			|| appconf.app_to_use == APP_NRF
+			|| appconf.app_to_use == APP_ADC
+			|| appconf.app_to_use == APP_ADC_UART) {
 
 			app_configuration saved_appconf;
 		
@@ -943,6 +947,9 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 			
 			// reset app chuk
 			appconf.app_chuk_conf.ctrl_type = saved_appconf.app_chuk_conf.ctrl_type;
+			
+			// reset app adc
+			appconf.app_adc_conf.ctrl_type = saved_appconf.app_adc_conf.ctrl_type;
 			
 			// reset throttle curve
 			appconf.app_ppm_conf.throttle_exp = saved_appconf.app_ppm_conf.throttle_exp;
@@ -1013,6 +1020,35 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 					case CHUK_CTRL_TYPE_CURRENT_NOREV:
 						if (!appconf.send_can_status) {
 							appconf.app_chuk_conf.ctrl_type = new_control_mode_int;
+						}
+					
+						remote_Mode = new_remote_Mode;
+						break;
+					default:
+						//only the basic settings which are defined by the bldc-tool
+						remote_Mode = 0;
+						break;
+					}
+				}
+				
+				if (appconf.app_to_use == APP_ADC || appconf.app_to_use == APP_ADC_UART) {
+					switch (new_control_mode_int) {
+					case ADC_CTRL_TYPE_NONE:
+					case ADC_CTRL_TYPE_CURRENT:
+					case ADC_CTRL_TYPE_CURRENT_REV_CENTER:
+					case ADC_CTRL_TYPE_CURRENT_REV_BUTTON:
+					case ADC_CTRL_TYPE_CURRENT_REV_BUTTON_BRAKE_ADC:
+					case ADC_CTRL_TYPE_CURRENT_NOREV_BRAKE_CENTER:
+					case ADC_CTRL_TYPE_CURRENT_NOREV_BRAKE_BUTTON:
+					case ADC_CTRL_TYPE_CURRENT_NOREV_BRAKE_ADC:
+					case ADC_CTRL_TYPE_DUTY:
+					case ADC_CTRL_TYPE_DUTY_REV_CENTER:
+					case ADC_CTRL_TYPE_DUTY_REV_BUTTON:
+					case ADC_CTRL_TYPE_PID:
+					case ADC_CTRL_TYPE_PID_REV_CENTER:
+					case ADC_CTRL_TYPE_PID_REV_BUTTON:
+						if (!appconf.send_can_status) {
+							appconf.app_adc_conf.ctrl_type = new_control_mode_int;
 						}
 					
 						remote_Mode = new_remote_Mode;
@@ -1264,6 +1300,8 @@ void commands_process_packet(unsigned char *data, unsigned int len) {
 		send_buffer[ind++] = remote_Mode;
 		if(appconf.app_to_use == APP_NUNCHUK || appconf.app_to_use == APP_NRF){
 			send_buffer[ind++] = appconf.app_chuk_conf.ctrl_type;
+		}else if (appconf.app_to_use == APP_ADC || appconf.app_to_use == APP_ADC_UART){
+			send_buffer[ind++] = appconf.app_adc_conf.ctrl_type;
 		}else{
 			send_buffer[ind++] = appconf.app_ppm_conf.ctrl_type;
 		}

@@ -2550,7 +2550,6 @@ static void run_pid_control_speed(float dt) {
 	
 	// Filter D
 	UTILS_LP_FAST(d_filter, d_term, m_conf->s_pid_kd_filter);
-	d_term = d_filter;
 
 	// I-term wind-up protection
 	utils_truncate_number(&i_term, -1.0, 1.0);
@@ -2559,7 +2558,7 @@ static void run_pid_control_speed(float dt) {
 	prev_error = error;
 
 	// Calculate output
-	float output = p_term + i_term + d_term;
+	float output = p_term + i_term + d_filter;
 	utils_truncate_number(&output, -1.0, 1.0);
 
 	// Optionally disable braking

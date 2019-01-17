@@ -267,23 +267,24 @@ static THD_FUNCTION(output_thread, arg) {
 			}
 			continue;
 		}
+		
+		float out_val = app_nunchuk_get_decoded_chuk();
+		utils_deadband(&out_val, config.hyst, 1.0);
+		out_val = utils_throttle_curve(out_val, config.throttle_exp, config.throttle_exp_brake, config.throttle_exp_mode);
 
-		if ((config.buttons_mirrored ? chuck_d.bt_c : chuck_d.bt_z) && !was_z && config.ctrl_type == CHUK_CTRL_TYPE_CURRENT &&
-				fabsf(current_now) < max_current_diff) {
+		if ((config.buttons_mirrored ? chuck_d.bt_c : chuck_d.bt_z) && !was_z && config.ctrl_type == CHUK_CTRL_TYPE_CURRENT && 
+				(fabsf(current_now) < max_current_diff || out_val < 0.0)) {
 			if (is_reverse) {
 				is_reverse = false;
 			} else {
 				is_reverse = true;
 			}
+			prev_current = 0.0;
 		}
 
 		was_z = config.buttons_mirrored ? chuck_d.bt_c : chuck_d.bt_z;
 
 		led_external_set_reversed(is_reverse);
-
-		float out_val = app_nunchuk_get_decoded_chuk();
-		utils_deadband(&out_val, config.hyst, 1.0);
-		out_val = utils_throttle_curve(out_val, config.throttle_exp, config.throttle_exp_brake, config.throttle_exp_mode);
 
 		// LEDs
 		float x_axis = ((float)chuck_d.js_x - 128.0) / 128.0;
@@ -494,36 +495,20 @@ static THD_FUNCTION(output_thread, arg) {
 			const float ramp_step = ((float)OUTPUT_ITERATION_TIME_MS * current_range) / (ramp_time * 1000.0);
 
 			float current_goal = prev_current;
-			const float goal_tmp = current_goal;
+
 			utils_step_towards(&current_goal, current, ramp_step);
-			bool is_decreasing = current_goal < goal_tmp;
 
-			// Make sure the desired current is close to the actual current to avoid surprises
-			// when changing direction
-			float goal_tmp2 = current_goal;
-			if (is_reverse) {
-				if (fabsf(current_goal + current_highest_abs) > max_current_diff) {
-					utils_step_towards(&goal_tmp2, -current_highest_abs, 2.0 * ramp_step);
-				}
-			} else {
-				if (fabsf(current_goal - current_highest_abs) > max_current_diff) {
-					utils_step_towards(&goal_tmp2, current_highest_abs, 2.0 * ramp_step);
-				}
-			}
-
-			// Always allow negative ramping
-			bool is_decreasing2 = goal_tmp2 < current_goal;
-			if ((!is_decreasing || is_decreasing2) && fabsf(out_val) > 0.001) {
-				current_goal = goal_tmp2;
-			}
-			
 			if (current == current_goal) {
 				ramp_up_from_timeout = false;
 			}
 
-			out_val = out_val / current * current_goal;
-						
 			current = current_goal;
+			
+			if (current < 0.0){
+		    	out_val = current / fabsf(mcconf->l_current_min);
+    		}else{
+    			out_val = current / mcconf->l_current_max;
+    		}
 		}
 
 		prev_current = current;
