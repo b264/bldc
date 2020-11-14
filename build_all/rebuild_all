@@ -501,6 +501,13 @@ make -j8 build_args='-DDISABLE_HW_LIMITS -DHW_SOURCE=\"hw_stormcore_100d.c\" -DH
 cd $DIR
 cp $FWPATH/build/BLDC_4_ChibiOS.bin $COPYDIR/VESC_default_no_hw_limits.bin
 
+# dual parallel single motor
+cd $FWPATH
+touch conf_general.h
+make -j8 build_args='-DHW_DUAL_CONFIG_PARALLEL -DDISABLE_HW_LIMITS -DHW_SOURCE=\"hw_stormcore_100d.c\" -DHW_HEADER=\"hw_stormcore_100d.h\"' USE_VERBOSE_COMPILE=no
+cd $DIR
+cp $FWPATH/build/BLDC_4_ChibiOS.bin $COPYDIR/VESC_dual_parallel_no_hw_limits.bin
+
 # Clean
 cd $FWPATH
 make clean
